@@ -1,17 +1,16 @@
 package cn.mythicland.memberlib;
 
-import cn.mythicland.framework.bukkit.BukkitComponentRegistrar;
-import cn.mythicland.framework.bukkit.BukkitRegistration;
+import cn.mythicland.framework.bukkit.bootstrap.BukkitRegistration;
+import cn.mythicland.framework.bukkit.component.BukkitComponentRegistrar;
 import cn.mythicland.framework.bukkit.task.BukkitTaskScheduler;
 import cn.mythicland.framework.bukkit.task.ScheduledTaskLifecycle;
 import cn.mythicland.framework.bukkit.task.TaskScheduler;
 import cn.mythicland.framework.component.ComponentContainer;
+import java.util.Objects;
+import javax.sql.DataSource;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
-
-import javax.sql.DataSource;
-import java.util.Objects;
 
 public final class MemberLib implements AutoCloseable {
     private final JavaPlugin plugin;

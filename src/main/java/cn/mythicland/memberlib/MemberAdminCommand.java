@@ -1,19 +1,13 @@
 package cn.mythicland.memberlib;
 
-import org.bukkit.plugin.java.JavaPlugin;
-
-import cn.mythicland.framework.bukkit.CommandComponent;
+import cn.mythicland.framework.bukkit.command.AbstractCommand;
+import cn.mythicland.framework.bukkit.command.CommandArgument;
+import cn.mythicland.framework.bukkit.command.CommandContext;
+import cn.mythicland.framework.bukkit.command.CommandRoute;
+import cn.mythicland.framework.bukkit.command.SuggestionProvider;
+import cn.mythicland.framework.bukkit.command.SuggestionSource;
+import cn.mythicland.framework.bukkit.component.CommandComponent;
 import cn.mythicland.framework.component.InjectComponent;
-import cn.mythicland.framework.command.AbstractCommand;
-import cn.mythicland.framework.command.CommandArgument;
-import cn.mythicland.framework.command.CommandContext;
-import cn.mythicland.framework.command.CommandRoute;
-import cn.mythicland.framework.command.SuggestionSource;
-import cn.mythicland.framework.command.SuggestionProvider;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.command.CommandSender;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -24,6 +18,10 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.plugin.java.JavaPlugin;
 
 @InjectComponent
 @CommandComponent

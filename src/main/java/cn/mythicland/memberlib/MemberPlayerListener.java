@@ -1,6 +1,6 @@
 package cn.mythicland.memberlib;
 
-import cn.mythicland.framework.bukkit.ListenerComponent;
+import cn.mythicland.framework.bukkit.component.ListenerComponent;
 import cn.mythicland.framework.component.InjectComponent;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;

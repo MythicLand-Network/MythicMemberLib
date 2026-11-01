@@ -181,7 +181,13 @@ public final class MemberService implements AutoCloseable {
         this.repository.rememberName(playerUniqueId, playerName);
     }
 
-    CompletableFuture<Optional<UUID>> findPlayer(String input) {
+    /**
+     * Resolves an exact online player name or a previously recorded name/UUID.
+     *
+     * @param input exact player name or UUID
+     * @return resolved player UUID, or an empty result when no player matches
+     */
+    public CompletableFuture<Optional<UUID>> findPlayer(String input) {
         org.bukkit.entity.Player online = Bukkit.getPlayerExact(input);
         if (online != null) return CompletableFuture.completedFuture(Optional.of(online.getUniqueId()));
         return CompletableFuture.supplyAsync(() -> this.repository.findPlayer(input), this.executor);

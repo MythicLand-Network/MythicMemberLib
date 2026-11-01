@@ -3,11 +3,18 @@ package cn.mythicland.memberlib;
 import java.time.Duration;
 import java.util.Locale;
 
-final class MemberDurationParser {
+public final class MemberDurationParser {
     private MemberDurationParser() {
     }
 
-    static Duration parse(String input) {
+    /**
+     * Parses a positive duration expressed as a number followed by s, m, h or d.
+     *
+     * @param input duration text
+     * @return parsed positive duration
+     * @throws IllegalArgumentException if the input is not a supported positive duration
+     */
+    public static Duration parse(String input) {
         if (input == null || input.length() < 2) throw new IllegalArgumentException("期限格式应为正数加 s/m/h/d");
         String normalized = input.trim().toLowerCase(Locale.ROOT);
         long amount;
