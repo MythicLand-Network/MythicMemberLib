@@ -9,8 +9,10 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -104,6 +106,22 @@ final class MemberRepository {
             List<MemberDefinition> replaced,
             List<MemberDefinition> granted
     ) {
+        Map<MemberDefinition, Long> grantedMillis = new LinkedHashMap<>();
+        for (MemberDefinition definition : granted) {
+            grantedMillis.put(definition, durationMillis);
+        }
+        return this.extend(playerUniqueId, key, scope, nowMillis, durationMillis, replaced, grantedMillis);
+    }
+
+    MemberRecord extend(
+            UUID playerUniqueId,
+            MemberKey key,
+            MemberScope scope,
+            long nowMillis,
+            long durationMillis,
+            List<MemberDefinition> replaced,
+            Map<MemberDefinition, Long> grantedMillis
+    ) {
         String maximum = this.mode == DatabaseMode.POSTGRESQL ? "GREATEST" : "MAX";
         String sql = "INSERT INTO mythic_membership (player_uuid, membership_id, scope, expires_at_millis) "
                 + "VALUES (?, ?, ?, ?) ON CONFLICT (player_uuid, membership_id, scope) "
@@ -152,19 +170,31 @@ final class MemberRepository {
                             new MemberRecord.Pause(blocker, remaining, null)));
                     blocker = covered.key();
                 }
-                for (MemberDefinition definition : granted) {
+                for (var grant : grantedMillis.entrySet()) {
+                    MemberDefinition definition = grant.getKey();
+                    long giftDurationMillis = grant.getValue();
                     MemberRecord gift = previous.stream().filter(record -> record.key().equals(definition.key())).findFirst().orElse(null);
                     if (gift != null && gift.permanent()) continue;
                     if (gift != null && gift.pause() != null
                             && (gift.pause().resumesAt() == null || now.isBefore(gift.pause().resumesAt()))) {
                         this.upsert(connection, new MemberRecord(playerUniqueId, gift.key(), gift.scope(), gift.expiresAt(),
                                 new MemberRecord.Pause(gift.pause().blocker(),
-                                        Math.addExact(gift.pause().remainingMillis(), durationMillis), null)));
+                                        Math.addExact(gift.pause().remainingMillis(), giftDurationMillis), null)));
                     } else {
-                        long expiry = Math.addExact(gift == null ? nowMillis
-                                : Math.max(nowMillis, gift.expiresAt().toEpochMilli()), durationMillis);
-                        this.upsert(connection, new MemberRecord(playerUniqueId, definition.key(), definition.scope(),
-                                Instant.ofEpochMilli(expiry)));
+                        if (gift != null && gift.pause() != null) {
+                            this.upsert(connection, new MemberRecord(
+                                    playerUniqueId, gift.key(), gift.scope(), gift.expiresAt()
+                            ));
+                        }
+                        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                            statement.setString(1, playerUniqueId.toString());
+                            statement.setString(2, definition.key().value());
+                            statement.setString(3, definition.scope().value());
+                            statement.setLong(4, Math.addExact(nowMillis, giftDurationMillis));
+                            statement.setLong(5, nowMillis);
+                            statement.setLong(6, giftDurationMillis);
+                            statement.executeUpdate();
+                        }
                     }
                 }
                 MemberRecord result = MemberTimeline.resolve(this.load(connection, playerUniqueId)).stream()

@@ -7,6 +7,7 @@ import org.bukkit.Bukkit;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -137,17 +138,37 @@ public final class MemberService implements AutoCloseable {
             Collection<MemberKey> replacedKeys,
             Collection<MemberKey> grantedKeys
     ) {
+        Map<MemberKey, Duration> grants = new LinkedHashMap<>();
+        for (MemberKey granted : grantedKeys) {
+            grants.put(granted, duration);
+        }
+        return this.replace(playerUniqueId, key, duration, replacedKeys, grants);
+    }
+
+    public CompletableFuture<MemberRecord> replace(
+            UUID playerUniqueId,
+            MemberKey key,
+            Duration duration,
+            Collection<MemberKey> replacedKeys,
+            Map<MemberKey, Duration> grantedDurations
+    ) {
         this.requirePositive(duration);
         MemberDefinition definition = this.requireDefinition(key);
-        if (replacedKeys.contains(key)) throw new IllegalArgumentException("Replacement memberships include target: " + key);
+        if (replacedKeys.contains(key))
+            throw new IllegalArgumentException("Replacement memberships include target: " + key);
         List<MemberDefinition> replaced = replacedKeys.stream().map(this::requireDefinition).toList();
-        if (grantedKeys.stream().anyMatch(granted -> granted.equals(key) || replacedKeys.contains(granted))) {
+        if (grantedDurations.keySet().stream()
+                .anyMatch(granted -> granted.equals(key) || replacedKeys.contains(granted))) {
             throw new IllegalArgumentException("Granted memberships overlap replacement memberships");
         }
-        List<MemberDefinition> granted = grantedKeys.stream().distinct().map(this::requireDefinition).toList();
+        Map<MemberDefinition, Long> grantedMillis = new LinkedHashMap<>();
+        grantedDurations.forEach((grantedKey, grantedDuration) -> {
+            this.requirePositive(grantedDuration);
+            grantedMillis.put(this.requireDefinition(grantedKey), grantedDuration.toMillis());
+        });
         long nowMillis = System.currentTimeMillis();
         return this.mutate(playerUniqueId, () -> this.repository.extend(
-                playerUniqueId, key, definition.scope(), nowMillis, duration.toMillis(), replaced, granted));
+                playerUniqueId, key, definition.scope(), nowMillis, duration.toMillis(), replaced, grantedMillis));
     }
 
     public CompletableFuture<List<MemberRecord>> activeMembers(MemberKey key) {

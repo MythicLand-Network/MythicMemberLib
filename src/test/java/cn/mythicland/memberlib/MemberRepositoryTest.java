@@ -174,6 +174,31 @@ class MemberRepositoryTest {
     }
 
     @Test
+    void giftDurationsShouldAccumulateIndependentlyOfThePurchasedRank() {
+        MemberKey rank = MemberKey.parse("test:mvp_plus_plus");
+        MemberDefinition pit = new MemberDefinition(MemberKey.parse("test:pit"), MemberScope.of("pit"), "Pit", "", 1);
+        MemberDefinition room = new MemberDefinition(MemberKey.parse("test:room"), MemberScope.of("room"), "Room", "", 1);
+        long now = System.currentTimeMillis();
+        long rankDuration = Duration.ofDays(30).toMillis();
+        Map<MemberDefinition, Long> gifts = Map.of(pit, rankDuration, room, Duration.ofDays(14).toMillis());
+        for (int previousDays : List.of(0, 10, -10)) {
+            UUID player = UUID.randomUUID();
+            if (previousDays != 0) this.repository.set(player, room.key(), room.scope(),
+                    Instant.ofEpochMilli(now).plus(Duration.ofDays(previousDays)));
+            for (int purchases = 1; purchases <= 2; purchases++) {
+                MemberRecord purchased = this.repository.extend(player, rank, MemberScope.NETWORK,
+                        now, rankDuration, List.of(), gifts);
+                List<MemberRecord> records = this.repository.load(player);
+                assertEquals(Instant.ofEpochMilli(now).plus(Duration.ofDays(30L * purchases)), purchased.expiresAt());
+                assertEquals(purchased.expiresAt(), records.stream().filter(record -> record.key().equals(pit.key()))
+                        .findFirst().orElseThrow().expiresAt());
+                assertEquals(Instant.ofEpochMilli(now).plus(Duration.ofDays(Math.max(0, previousDays) + 14L * purchases)),
+                        records.stream().filter(record -> record.key().equals(room.key())).findFirst().orElseThrow().expiresAt());
+            }
+        }
+    }
+
+    @Test
     void giftFailureShouldRollBackRankPurchaseAndPausedMemberships() throws Exception {
         UUID player = UUID.randomUUID();
         MemberDefinition vip = new MemberDefinition(MemberKey.parse("test:vip"), MemberScope.NETWORK, "VIP", "", 1);
@@ -190,7 +215,7 @@ class MemberRepositoryTest {
 
         assertThrows(IllegalStateException.class, () -> this.repository.extend(player,
                 MemberKey.parse("test:mvp"), MemberScope.NETWORK, System.currentTimeMillis(),
-                Duration.ofDays(30).toMillis(), List.of(vip), List.of(gift)));
+                Duration.ofDays(30).toMillis(), List.of(vip), Map.of(gift, Duration.ofDays(14).toMillis())));
 
         assertEquals(before, this.repository.load(player));
     }
