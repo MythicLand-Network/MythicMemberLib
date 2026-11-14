@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -24,6 +25,7 @@ public final class MemberService implements AutoCloseable {
     private final Map<MemberKey, MemberDefinition> definitions;
     private volatile Map<MemberKey, MemberDefinition> definitionsSnapshot = Map.of();
     private final Map<UUID, MemberView> recordsByPlayer;
+    private final ConcurrentMap<UUID, CompletableFuture<MemberView>> pendingLoads = new ConcurrentHashMap<>();
 
     MemberService(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -73,12 +75,20 @@ public final class MemberService implements AutoCloseable {
     }
 
     public CompletableFuture<MemberView> load(UUID playerUniqueId) {
-        return CompletableFuture.supplyAsync(() -> {
-            List<MemberRecord> records = this.repository.load(playerUniqueId);
-            MemberView view = new MemberView(playerUniqueId, records, this.definitionSnapshot(), Instant.now());
-            this.recordsByPlayer.put(playerUniqueId, view);
-            return view;
-        }, this.executor);
+        CompletableFuture<MemberView> load = this.pendingLoads.compute(playerUniqueId, (id, previousLoad) -> {
+            if (previousLoad != null) {
+                return previousLoad.handleAsync((view, failure) -> this.loadNow(id), this.executor);
+            }
+            return CompletableFuture.completedFuture(null).thenApplyAsync(ignored -> this.loadNow(id), this.executor);
+        });
+        return load.whenComplete((view, failure) -> this.pendingLoads.remove(playerUniqueId, load));
+    }
+
+    private MemberView loadNow(UUID playerUniqueId) {
+        List<MemberRecord> records = this.repository.load(playerUniqueId);
+        MemberView view = new MemberView(playerUniqueId, records, this.definitionSnapshot(), Instant.now());
+        this.recordsByPlayer.put(playerUniqueId, view);
+        return view;
     }
 
     public CompletableFuture<MemberView> lookup(UUID playerUniqueId) {
@@ -214,7 +224,7 @@ public final class MemberService implements AutoCloseable {
         return CompletableFuture.supplyAsync(() -> this.repository.findPlayer(input), this.executor);
     }
 
-    void evict(UUID playerUniqueId) {
+    public void evict(UUID playerUniqueId) {
         this.recordsByPlayer.remove(playerUniqueId);
     }
 
@@ -222,7 +232,6 @@ public final class MemberService implements AutoCloseable {
         MemberView previous = this.recordsByPlayer.get(playerUniqueId);
         this.load(playerUniqueId).whenComplete((view, throwable) -> {
             if (throwable != null) {
-                if (previous != null) this.recordsByPlayer.put(playerUniqueId, previous);
                 this.plugin.getLogger().warning(
                         "Failed to refresh membership data for " + playerUniqueId + ": " + throwable.getMessage()
                 );
