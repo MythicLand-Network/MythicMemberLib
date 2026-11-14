@@ -1,6 +1,6 @@
 apply from: file('../MythicFramework/gradle/workspace-build-lock.gradle')
 
-rootProject.name = 'mythic-memberlib'
+rootProject.name = 'MythicMemberLib'
 
 def frameworkDirectory = file('../MythicFramework')
 
